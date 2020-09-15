@@ -2,6 +2,10 @@ from aiohttp import web
 import aiofiles
 import asyncio
 import os
+import logging
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 ZIP_FILE_NAME = 'archive.zip'
@@ -38,6 +42,7 @@ async def archivate(request):
     )
     while True:
         chunk = await proc.stdout.read(n=MAX_FILE_FRAGMENT_SIZE)
+        logging.info(u'Sending archive chunk ...')
 
         if chunk == b'':
             return response
