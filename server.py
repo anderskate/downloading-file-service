@@ -1,6 +1,7 @@
 from aiohttp import web
 import aiofiles
 import asyncio
+import os
 
 
 ZIP_FILE_NAME = 'archive.zip'
@@ -12,6 +13,15 @@ MAX_FILE_FRAGMENT_SIZE = 100000
 
 async def archivate(request):
     """Zip the desired directory and return to the user"""
+
+    archive_hash = request.match_info.get('archive_hash')
+    archive_exists = os.path.exists(f'{PHOTOS_DIRECTORY}/{archive_hash}')
+    if not archive_exists:
+        raise web.HTTPNotFound(
+            text='404: Not Found\n'
+                 'The archive does not exist or has been deleted'
+        )
+
     response = web.StreamResponse()
 
     # Set required headers
@@ -22,7 +32,6 @@ async def archivate(request):
     # Send HTTP headers to the client
     await response.prepare(request)
 
-    archive_hash = request.match_info.get('archive_hash')
     proc = await asyncio.create_subprocess_shell(
         f'cd {PHOTOS_DIRECTORY}/ && zip -r - {archive_hash}',
         stdout=asyncio.subprocess.PIPE,
