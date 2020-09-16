@@ -1,25 +1,25 @@
 from aiohttp import web
+from functools import partial
 import aiofiles
 import asyncio
 import os
 import logging
-
-
-logging.basicConfig(level=logging.DEBUG)
+import argparse
 
 
 ZIP_FILE_NAME = 'archive.zip'
-PHOTOS_DIRECTORY = 'test_photos'
 
 # Maximum file fragment size to be returned to the user
 MAX_FILE_FRAGMENT_SIZE = 100000
 
 
-async def archivate(request):
+async def archivate(request, parser_args):
     """Zip the desired directory and return to the user"""
+    if parser_args.log:
+        logging.basicConfig(level=logging.DEBUG)
 
     archive_hash = request.match_info.get('archive_hash')
-    archive_exists = os.path.exists(f'{PHOTOS_DIRECTORY}/{archive_hash}')
+    archive_exists = os.path.exists(f'{parser_args.dir}/{archive_hash}')
     if not archive_exists:
         raise web.HTTPNotFound(
             text='404: Not Found\n'
@@ -37,18 +37,32 @@ async def archivate(request):
     await response.prepare(request)
 
     proc = await asyncio.create_subprocess_shell(
-        f'cd {PHOTOS_DIRECTORY}/ && zip -r - {archive_hash}',
+        f'cd {parser_args.dir}/ && zip -r - {archive_hash}',
         stdout=asyncio.subprocess.PIPE,
     )
-    while True:
-        chunk = await proc.stdout.read(n=MAX_FILE_FRAGMENT_SIZE)
-        logging.info(u'Sending archive chunk ...')
+    try:
+        while True:
+            chunk = await proc.stdout.read(n=MAX_FILE_FRAGMENT_SIZE)
+            logging.info(u'Sending archive chunk ...')
 
-        if chunk == b'':
-            return response
+            # For delay response if debug
+            await asyncio.sleep(parser_args.delay)
 
-        # Send another portion of the response to the client
-        await response.write(chunk)
+            if chunk == b'':
+                return response
+
+            # Send another portion of the response to the client
+            await response.write(chunk)
+    except asyncio.CancelledError:
+        logging.error(u'Download was interrupted')
+        raise
+    finally:
+        # Check that the process still exists
+        if proc.returncode:
+            proc.kill()
+            await proc.communicate()
+
+        return response
 
 
 async def handle_index_page(request):
@@ -58,6 +72,27 @@ async def handle_index_page(request):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--log',
+        action='store_true',
+        help='Activate logging'
+    )
+    parser.add_argument(
+        '--delay',
+        type=int,
+        default=0,
+        help='Activate delay for response'
+    )
+    parser.add_argument(
+        '--dir',
+        type=str,
+        default='test_photos/',
+        help='Photo archive directory'
+    )
+    parser_args = parser.parse_args()
+    archivate = partial(archivate, parser_args=parser_args)
+
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),

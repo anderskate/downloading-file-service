@@ -20,34 +20,41 @@
 ```
 
 
-## Как установить
+## Как установить и запустить локально
 
-Для работы микросервиса нужен Python версии не ниже 3.6.
+Для работы микросервиса нужен Python версии не ниже 3.6
 
+Установите необходимые зависимости
 ```bash
 pip install -r requirements.txt
 ```
 
-## Как запустить
-
+Запустите сервер локально
 ```bash
 python server.py
 ```
 
-Сервер запустится на порту 8080, чтобы проверить его работу перейдите в браузере на страницу [http://127.0.0.1:8080/](http://127.0.0.1:8080/).
-
-## Как развернуть на сервере
+Для просмотра дополнительных параметров, введите следующую команду
+```bash
+python server.py --help
+```
 
 ```bash
-python server.py
+optional arguments:
+  -h, --help     show this help message and exit
+  --log          Activate logging
+  --delay DELAY  Activate delay for response
+  --dir DIR      Photo archive directory
 ```
 
-После этого перенаправить на микросервис запросы, начинающиеся с `/archive/`. Например:
 
+## Установка и запуск с помощью Docker compose
+
+```bash
+docker-compose up
 ```
-GET http://host.ru/archive/3bea29ccabbbf64bdebcc055319c5745/
-GET http://host.ru/archive/af1ad8c76fda2e48ea9aed2937e972ea/
-```
+
+Сервер запустится на порту 8080, чтобы проверить его работу перейдите в браузере на страницу [http://0.0.0.0:8080/](http://0.0.0.0:8080/).
 
 # Цели проекта
 
