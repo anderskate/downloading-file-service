@@ -15,11 +15,10 @@ MAX_FILE_FRAGMENT_SIZE = 100000
 
 async def archivate(request, parser_args):
     """Zip the desired directory and return to the user"""
-    if parser_args.log:
-        logging.basicConfig(level=logging.DEBUG)
+    archive_hash = request.match_info['archive_hash']
+    archive = os.path.join(parser_args.dir, archive_hash)
+    archive_exists = os.path.exists(archive)
 
-    archive_hash = request.match_info.get('archive_hash')
-    archive_exists = os.path.exists(f'{parser_args.dir}/{archive_hash}')
     if not archive_exists:
         raise web.HTTPNotFound(
             text='404: Not Found\n'
@@ -37,7 +36,7 @@ async def archivate(request, parser_args):
     await response.prepare(request)
 
     proc = await asyncio.create_subprocess_shell(
-        f'cd {parser_args.dir}/ && zip -r - {archive_hash}',
+        f'cd {parser_args.dir} && zip -r - {archive_hash}',
         stdout=asyncio.subprocess.PIPE,
     )
     try:
@@ -91,6 +90,10 @@ if __name__ == '__main__':
         help='Photo archive directory'
     )
     parser_args = parser.parse_args()
+
+    if parser_args.log:
+        logging.basicConfig(level=logging.DEBUG)
+
     archivate = partial(archivate, parser_args=parser_args)
 
     app = web.Application()
