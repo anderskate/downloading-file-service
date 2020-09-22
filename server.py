@@ -1,8 +1,8 @@
 from aiohttp import web
 from functools import partial
+from pathlib import Path
 import aiofiles
 import asyncio
-import os
 import logging
 import argparse
 
@@ -13,11 +13,14 @@ ZIP_FILE_NAME = 'archive.zip'
 MAX_FILE_FRAGMENT_SIZE = 100000
 
 
-async def archivate(request, parser_args):
-    """Zip the desired directory and return to the user"""
+async def archivate(request, directory, delay):
+    """Zip the desired directory and return to the user
+
+    * directory - Path to archive with photo
+    * delay -Waiting time for response
+    """
     archive_hash = request.match_info['archive_hash']
-    archive = os.path.join(parser_args.dir, archive_hash)
-    archive_exists = os.path.exists(archive)
+    archive_exists = Path(directory, archive_hash).exists()
 
     if not archive_exists:
         raise web.HTTPNotFound(
@@ -35,19 +38,23 @@ async def archivate(request, parser_args):
     # Send HTTP headers to the client
     await response.prepare(request)
 
-    proc = await asyncio.create_subprocess_shell(
-        f'cd {parser_args.dir} && zip -r - {archive_hash}',
+    zip_command = ['zip', '-r', '-', archive_hash]
+    proc = await asyncio.create_subprocess_exec(
+        *zip_command,
         stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=directory,
     )
+
     try:
         while True:
             chunk = await proc.stdout.read(n=MAX_FILE_FRAGMENT_SIZE)
             logging.info(u'Sending archive chunk ...')
 
             # For delay response if debug
-            await asyncio.sleep(parser_args.delay)
+            await asyncio.sleep(delay)
 
-            if chunk == b'':
+            if not chunk:
                 return response
 
             # Send another portion of the response to the client
@@ -94,7 +101,11 @@ if __name__ == '__main__':
     if parser_args.log:
         logging.basicConfig(level=logging.DEBUG)
 
-    archivate = partial(archivate, parser_args=parser_args)
+    archivate = partial(
+        archivate,
+        directory=parser_args.dir,
+        delay=parser_args.delay,
+    )
 
     app = web.Application()
     app.add_routes([
